@@ -7,8 +7,8 @@
 // @match        https://github.com/*/*/pull/*
 // @connect      github.com
 // @run-at       document-end
-// @updateURL    https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker-v3.user.js
-// @downloadURL  https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker-v3.user.js
+// @updateURL    https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker.user.js
+// @downloadURL  https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker.user.js
 // ==/UserScript==
 
 (function () {

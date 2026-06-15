@@ -1,6 +1,6 @@
 # Backport Tracker Userscript — 功能与实现总结
 
-文件：`~/Downloads/backport-tracker-v3.user.js`
+文件：`~/Downloads/backport-tracker.user.js`
 运行环境：Tampermonkey，匹配 `https://github.com/*/*/pull/*`
 
 ---

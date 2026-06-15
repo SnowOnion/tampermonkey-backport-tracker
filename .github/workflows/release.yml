@@ -54,22 +54,22 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          sed -i -E "s|^(// @version[[:space:]]+).*$|\1$VERSION|" backport-tracker-v3.user.js
-          grep -n '^// @version' backport-tracker-v3.user.js
+          sed -i -E "s|^(// @version[[:space:]]+).*$|\1$VERSION|" backport-tracker.user.js
+          grep -n '^// @version' backport-tracker.user.js
 
       - name: Commit version bump
         env:
           VERSION: ${{ inputs.version }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if git diff --quiet -- backport-tracker-v3.user.js; then
+          if git diff --quiet -- backport-tracker.user.js; then
             echo "Userscript already has version $VERSION; continuing without a version bump commit"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backport-tracker-v3.user.js
+          git add backport-tracker.user.js
           git commit -m "Release v$VERSION"
           git push origin "HEAD:$DEFAULT_BRANCH"
 
@@ -92,7 +92,7 @@ jobs:
           fi
 
           gh release create "v$VERSION" \
-            backport-tracker-v3.user.js \
+            backport-tracker.user.js \
             --title "v$VERSION" \
             --generate-notes \
             $prerelease_flag

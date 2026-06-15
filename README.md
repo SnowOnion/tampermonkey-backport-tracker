@@ -19,7 +19,7 @@ Tampermonkey userscript for GitHub pull requests. It adds a compact backport pan
 
 Raw install URL:
 
-`https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker-v3.user.js`
+`https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker.user.js`
 
 ## Status Meanings
 
@@ -62,7 +62,7 @@ PR title
 
 ## Repository Files
 
-- `backport-tracker-v3.user.js`: the userscript itself.
+- `backport-tracker.user.js`: the userscript itself.
 - `backport-tracker-summary.md`: implementation notes and internal behavior summary.
 
 ## Release Workflow
@@ -79,7 +79,7 @@ Use it from the GitHub web UI:
 
 The workflow will:
 
-- update `@version` in `backport-tracker-v3.user.js`
+- update `@version` in `backport-tracker.user.js`
 - commit the version bump to `master`
 - create and push tag `v<version>`
 - create a GitHub Release and attach the userscript file
