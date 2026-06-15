@@ -60,12 +60,11 @@
 | 优先级 | 条件 | ciStatus | 含义 |
 |---|---|---|---|
 | 1 | 普通测试有失败 | `test_fail` | 测试失败 |
-| 2 | manager approval 被 reject 且还有测试在跑 | `test_fail` | 混合失败状态 |
-| 3 | 有普通测试还在运行 | `pending` | 测试进行中 |
-| 4 | 所有普通测试结束但 manager approval 未 Approved | `mgr_pending` | 卡在 MA |
-| 5 | 所有 pass，MA 也 Approved | `success` | 全部通过 |
+| 2 | 有普通测试还在运行 | `pending` | 测试进行中 |
+| 3 | 所有普通测试结束，且存在 manager approval check 但尚未 Approved | `ma_pending` | 等待 MA |
+| 4 | 所有普通测试结束，且 manager approval 已 Approved 或根本不存在该 check | `success` | 全部通过 |
 
-**注意**：`mgr_pending` 不等于"只差 merge"，还涵盖 MA 被 reject 或 MA check 不存在的情况，统称"测试已结束但 MA 这条线未通过"。
+**注意**：manager approval 的非 Approved 状态（包括 `ACTION_REQUIRED`）统一归到 `ma_pending`，对外显示为 `WAITING MA`。如果压根没有 manager approval check，则不会再误报为 pending，而是和其他 checks 一起按通过处理。
 
 ---
 
@@ -84,16 +83,16 @@
 每条 backport PR 显示为一行：
 
 - 左侧：`#<number> <branch名>` 的可点击链接
-- 右侧图标：
+- 右侧：状态 badge + 图标：
 
 | ciStatus | 图标 | 颜色 |
 |---|---|---|
-| `fetching` | 转动的 sync 图标 | 灰色 |
-| `test_fail` | ✕ | 红色 |
-| `mgr_pending` | 盾牌 | 黄色 |
-| `success` | ✓ | 绿色 |
-| `pending` | 圆点 | 黄色 |
-| `error` | 感叹号三角 | 红色 |
+| `fetching` | `LOADING` + 转动的 sync 图标 | 灰色 |
+| `test_fail` | `FAIL` + ✕ | 红色 |
+| `ma_pending` | `WAITING MA` + 盾牌 | 黄色 |
+| `success` | `PASS` + ✓ | 绿色 |
+| `pending` | `RUNNING` + 圆点 | 黄色 |
+| `error` | `ERROR` + 感叹号三角 | 红色 |
 | `closed` | 半透明 ✕ | — |
 | `merged` | Merged 标签 + ✓ | 紫/绿 |
 | `missing` | Missing 标签 | 黄色边框 |
@@ -107,6 +106,8 @@
 {PR 标题}
 [STATUS] branch: https://github.com/.../pull/...
 ```
+
+open PR 的状态文案统一为：`FAIL` / `RUNNING` / `WAITING MA` / `PASS`。
 
 ---
 

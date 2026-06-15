@@ -1,0 +1,98 @@
+name: Release Userscript
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Userscript version without leading v (example: 3.0.1)"
+        required: true
+        type: string
+      prerelease:
+        description: "Create GitHub prerelease"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure workflow runs from default branch
+        env:
+          CURRENT_BRANCH: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$CURRENT_BRANCH" != "$DEFAULT_BRANCH" ]]; then
+            echo "Run this workflow from the default branch: $DEFAULT_BRANCH"
+            exit 1
+          fi
+
+      - name: Validate version input
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "Version must look like 3.0.1"
+            exit 1
+          fi
+
+          if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q .; then
+            echo "Tag v$VERSION already exists"
+            exit 1
+          fi
+
+      - name: Update userscript version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sed -i -E "s|^(// @version[[:space:]]+).*$|\1$VERSION|" backport-tracker-v3.user.js
+          grep -n '^// @version' backport-tracker-v3.user.js
+
+      - name: Commit version bump
+        env:
+          VERSION: ${{ inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if git diff --quiet -- backport-tracker-v3.user.js; then
+            echo "Userscript already has version $VERSION; continuing without a version bump commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backport-tracker-v3.user.js
+          git commit -m "Release v$VERSION"
+          git push origin "HEAD:$DEFAULT_BRANCH"
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          prerelease_flag=""
+          if [[ "$PRERELEASE" == "true" ]]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          gh release create "v$VERSION" \
+            backport-tracker-v3.user.js \
+            --title "v$VERSION" \
+            --generate-notes \
+            $prerelease_flag

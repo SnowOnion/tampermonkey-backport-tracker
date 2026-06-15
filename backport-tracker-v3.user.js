@@ -7,8 +7,8 @@
 // @match        https://github.com/*/*/pull/*
 // @connect      github.com
 // @run-at       document-end
-// @updateURL    https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/main/backport-tracker-v3.user.js
-// @downloadURL  https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/main/backport-tracker-v3.user.js
+// @updateURL    https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker-v3.user.js
+// @downloadURL  https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker-v3.user.js
 // ==/UserScript==
 
 (function () {
@@ -183,6 +183,39 @@
         return hasBackportToken(identity?.title)
             || hasBackportToken(identity?.headBranch)
             || isBackportBaseBranch(identity?.baseBranch);
+    }
+
+    function getOpenPrStatusLabel(ciStatus) {
+        if (ciStatus === 'test_fail') return 'FAIL';
+        if (ciStatus === 'pending') return 'RUNNING';
+        if (ciStatus === 'ma_pending') return 'WAITING MA';
+        if (ciStatus === 'success') return 'PASS';
+        if (ciStatus === 'error') return 'ERROR';
+        if (ciStatus === 'fetching') return 'LOADING';
+        return (ciStatus || 'PENDING').toUpperCase().replace(/_/g, ' ');
+    }
+
+    function getOpenPrStatusIcon(ciStatus) {
+        if (ciStatus === 'fetching') return OCTICONS.sync.replace('octicon-sync', 'octicon-sync anim-rotate');
+        if (ciStatus === 'test_fail') return OCTICONS.x;
+        if (ciStatus === 'ma_pending') return OCTICONS.shield;
+        if (ciStatus === 'success') return OCTICONS.check;
+        if (ciStatus === 'error') return OCTICONS.alert;
+        return OCTICONS.dot;
+    }
+
+    function getOpenPrStatusBadgeStyle(ciStatus) {
+        const base = 'padding:1px 6px;border-radius:2em;font-size:0.85em;white-space:nowrap;';
+        if (ciStatus === 'test_fail' || ciStatus === 'error') {
+            return `${base}color:var(--color-danger-fg);border:1px solid var(--color-danger-emphasis);background:var(--color-danger-subtle);`;
+        }
+        if (ciStatus === 'ma_pending' || ciStatus === 'pending') {
+            return `${base}color:var(--color-attention-fg);border:1px solid var(--color-attention-emphasis);background:var(--color-attention-subtle);`;
+        }
+        if (ciStatus === 'success') {
+            return `${base}color:var(--color-success-fg);border:1px solid var(--color-success-emphasis);background:var(--color-success-subtle);`;
+        }
+        return `${base}color:var(--color-fg-muted);border:1px solid var(--color-border-default);background:var(--color-canvas-subtle);`;
     }
 
     function getPrContext() {
@@ -398,14 +431,20 @@
             }
 
             if (foundChecks.length > 0) {
-                let run = 0, fail = 0, pass = 0, mgrStatus = "Pending", testAttentionUrl = null, mgrJumpUrl = null;
+                let run = 0, fail = 0, pass = 0;
+                let hasManagerCheck = false;
+                let hasApprovedManagerCheck = false;
+                let hasPendingManagerCheck = false;
+                let testAttentionUrl = null, mgrJumpUrl = null;
                 foundChecks.forEach(c => {
                     const isMgr = c.name.includes("manager approval");
                     const isPass = ['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.state);
                     const isFail = ['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(c.state);
                     if (isMgr) {
+                        hasManagerCheck = true;
                         mgrJumpUrl = c.url || mgrJumpUrl;
-                        if (isFail) mgrStatus = "Rejected"; else if (isPass) mgrStatus = "Approved";
+                        if (isPass) hasApprovedManagerCheck = true;
+                        else hasPendingManagerCheck = true;
                     } else {
                         if (isFail) {
                             fail++;
@@ -419,19 +458,26 @@
                     }
                 });
 
-                // Manager approval should only surface as its own pending state
-                // once all non-manager tests have fully settled without failures.
+                const managerApproved = hasManagerCheck && hasApprovedManagerCheck && !hasPendingManagerCheck;
+                const managerStatus = !hasManagerCheck ? 'Not required' : (managerApproved ? 'Approved' : 'Waiting MA');
+
                 if (fail > 0) result.ciStatus = 'test_fail';
-                else if (mgrStatus === "Rejected" && run > 0) result.ciStatus = 'test_fail';
                 else if (run > 0) result.ciStatus = 'pending';
-                else if (mgrStatus !== "Approved") result.ciStatus = 'mgr_pending';
-                else if (pass > 0) result.ciStatus = 'success';
+                else if (hasManagerCheck && !managerApproved) result.ciStatus = 'ma_pending';
+                else result.ciStatus = 'success';
 
                 if (testAttentionUrl && testAttentionUrl.startsWith('/')) testAttentionUrl = `https://github.com${testAttentionUrl}`;
                 if (mgrJumpUrl && mgrJumpUrl.startsWith('/')) mgrJumpUrl = `https://github.com${mgrJumpUrl}`;
 
-                result.jumpUrl = ((result.ciStatus === 'test_fail' || result.ciStatus === 'pending') ? testAttentionUrl : mgrJumpUrl) || prUrl;
-                result.tooltip = `Jobs: ${pass} passed, ${fail} failed, ${run} running\nManager: ${mgrStatus}`;
+                if (result.ciStatus === 'test_fail' || result.ciStatus === 'pending') {
+                    result.jumpUrl = testAttentionUrl || prUrl;
+                } else if (result.ciStatus === 'ma_pending') {
+                    result.jumpUrl = mgrJumpUrl || prUrl;
+                } else {
+                    result.jumpUrl = prUrl;
+                }
+
+                result.tooltip = `${getOpenPrStatusLabel(result.ciStatus)}\nJobs: ${pass} passed, ${fail} failed, ${run} running\nManager: ${managerStatus}`;
             } else {
                 result.ciStatus = 'error';
                 result.tooltip = "No CI reported yet (Branch not deployed or Draft).";
@@ -1048,19 +1094,21 @@
             } else if (pr.closed) {
                 iconDiv.innerHTML = `<span style="opacity:0.5">${OCTICONS.x}</span>`;
             } else {
-                const ciLink = document.createElement('a');
-                ciLink.href      = pr.jumpUrl || pr.url;
-                ciLink.target    = "_blank";
-                ciLink.rel       = 'noopener noreferrer';
-                ciLink.className = "d-flex no-underline";
-                let icon = OCTICONS.dot;
-                if      (pr.ciStatus === 'fetching')                         icon = OCTICONS.sync.replace('octicon-sync', 'octicon-sync anim-rotate');
-                else if (pr.ciStatus === 'test_fail')                           icon = OCTICONS.x;
-                else if (pr.ciStatus === 'mgr_pending')                      icon = OCTICONS.shield;
-                else if (pr.ciStatus === 'success')                          icon = OCTICONS.check;
-                else if (pr.ciStatus === 'error')                            icon = OCTICONS.alert;
-                ciLink.innerHTML = icon;
-                iconDiv.appendChild(ciLink);
+                const statusWrap = document.createElement('span');
+                statusWrap.className = 'd-flex flex-items-center';
+                statusWrap.style.gap = '4px';
+
+                const statusBadge = document.createElement('span');
+                statusBadge.textContent = getOpenPrStatusLabel(pr.ciStatus);
+                statusBadge.style.cssText = getOpenPrStatusBadgeStyle(pr.ciStatus);
+
+                const statusIcon = document.createElement('span');
+                statusIcon.className = 'd-flex flex-items-center';
+                statusIcon.innerHTML = getOpenPrStatusIcon(pr.ciStatus);
+
+                statusWrap.appendChild(statusBadge);
+                statusWrap.appendChild(statusIcon);
+                iconDiv.appendChild(statusWrap);
             }
 
             row.appendChild(labelDiv);
@@ -1161,7 +1209,7 @@
             if (!pr.hasPR) return `[PENDING] ${pr.branch}`;
             const status = pr.merged  ? 'MERGED'
                          : pr.closed  ? 'CLOSED'
-                         : pr.ciStatus.toUpperCase().replace(/_/g, ' ');
+                         : getOpenPrStatusLabel(pr.ciStatus);
             return `[${status}] ${pr.branch}: ${pr.url}`;
         });
 
