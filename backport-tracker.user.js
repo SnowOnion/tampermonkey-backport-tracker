@@ -9,6 +9,7 @@
 // @run-at       document-end
 // @updateURL    https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker.user.js
 // @downloadURL  https://raw.githubusercontent.com/houmkh/tampermonkey-backport-tracker/master/backport-tracker.user.js
+// @icon         https://raw.githubusercontent.com/primer/octicons/main/icons/git-pull-request-24.svg
 // ==/UserScript==
 
 (function () {
