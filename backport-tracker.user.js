@@ -717,8 +717,21 @@
             if (!resp.ok) return null;
             const html = await resp.text();
             const doc = new DOMParser().parseFromString(html, 'text/html');
+            
             const remoteFirstComment = doc.querySelector('.comment-body, [data-testid="markdown-body"]');
-            return findOriginalPrInCommentRoot(remoteFirstComment, repo, currentPrNumber);
+            const remoteCandidate = findOriginalPrInCommentRoot(remoteFirstComment, repo, currentPrNumber);
+            if (remoteCandidate) return remoteCandidate;
+
+            // Fallback: check PR title if body doesn't contain original PR reference
+            const prTitle = findPrTitleInDoc(doc, currentPrNumber);
+            if (prTitle) {
+                const titleDiv = document.createElement('div');
+                titleDiv.textContent = prTitle;
+                const titleCandidate = findOriginalPrInCommentRoot(titleDiv, repo, currentPrNumber);
+                if (titleCandidate) return titleCandidate;
+            }
+
+            return null;
         } catch (_) {
             return null;
         }
